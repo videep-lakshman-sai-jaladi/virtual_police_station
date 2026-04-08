@@ -5,6 +5,7 @@ import Home from "./Home";
 import Signup from "./Signup";
 import Login from "./Login";
 import FIRForm from "./fir";
+import ESignSuccess from "./ESignSuccess";
 function App() {
   return (
     <Router>
@@ -14,6 +15,7 @@ function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/login" element={<Login/>}/>
         <Route path="/e-fir" element={<FIRForm/>}/>
+        <Route path="/esign-success" element={<ESignSuccess />} />
       </Routes>
     </Router>
   );

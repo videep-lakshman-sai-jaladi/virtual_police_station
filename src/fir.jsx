@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import jsPDF from "jspdf";
+
 
 const FIRForm = () => {
   const [formData, setFormData] = useState({
@@ -7,21 +9,117 @@ const FIRForm = () => {
     offenceType: 'Theft', description: '', accusedDetails: '',
     witnessDetails: '', evidence: null
   });
+  const [aadhaar, setAadhaar] = useState("");
+const [otp, setOtp] = useState("");
+const [signed, setSigned] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
   };
 
-  const handleFileChange = (e) => {
-    setFormData({ ...formData, evidence: e.target.files[0] });
-  };
+const handleFileChange = async (e) => {
+  const file = e.target.files[0];
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    console.log('Final FIR Submission:', formData);
-    alert('FIR Complaint Registered Successfully in the Virtual Station Database!');
-  };
+  setFormData({ ...formData, evidence: file });
+
+  const formDataUpload = new FormData();
+  formDataUpload.append("file", file);
+
+  const res = await fetch("http://localhost:5000/verify-evidence", {
+    method: "POST",
+    body: formDataUpload
+  });
+
+  const data = await res.json();
+  alert("Evidence Status: " + data.status);
+};
+// ✅ OUTSIDE (correct)
+const sendOTP = async () => {
+  const res = await fetch("http://localhost:5000/send-otp", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ aadhaar })
+  });
+
+  const data = await res.json();
+  alert(data.message);
+};
+
+const verifyOTP = async () => {
+  const res = await fetch("http://localhost:5000/verify-otp", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ aadhaar, otp })
+  });
+
+  const data = await res.json();
+
+  if (data.success) {
+    setSigned(true);
+    alert("✅ FIR Digitally Signed!");
+  } else {
+    alert("❌ Invalid OTP");
+  }
+};
+
+const handleESign = async () => {
+  const res = await fetch("http://localhost:5000/esign-init", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(formData)
+  });
+
+  const data = await res.json();
+  window.location.href = data.redirectUrl;
+};
+
+
+const handleSubmit = async (e) => {
+  e.preventDefault();
+
+  const res = await fetch("http://localhost:5000/submit-fir", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(formData)
+  });
+
+  const data = await res.json();
+
+  alert("FIR Submitted! ID: " + data.firId);
+};
+
+
+const generatePDF = () => {
+  const doc = new jsPDF();
+
+  doc.setFontSize(16);
+  doc.text("FIR Report", 20, 20);
+
+  doc.setFontSize(12);
+  doc.text(`Name: ${formData.complainantName}`, 20, 40);
+  doc.text(`Father Name: ${formData.fatherName}`, 20, 50);
+  doc.text(`Contact: ${formData.contact}`, 20, 60);
+
+  doc.text(`Incident Date: ${formData.incidentDate}`, 20, 80);
+  doc.text(`Location: ${formData.location}`, 20, 90);
+
+  doc.text("Description:", 20, 110);
+  doc.text(formData.description, 20, 120, { maxWidth: 170 });
+  doc.text("FIR Report", 20, 20);
+  doc.text(`Name: ${formData.complainantName}`, 20, 40);
+
+  if (signed) {
+    doc.setTextColor(0, 128, 0);
+    doc.text("Digitally Signed via Aadhaar eSign", 20, 80);
+  }
+
+  doc.save("FIR_Report.pdf");
+};
 
   return (
     <div className="fir-page-container">
@@ -97,7 +195,6 @@ const FIRForm = () => {
                 <textarea name="description" className="form-control fir-input" rows="5" placeholder="Provide a chronological sequence of the event..." onChange={handleChange} required></textarea>
               </div>
 
-              {/* SECTION 4: EVIDENCE */}
               <h5 className="fir-section-title">4. Evidence & Evidence</h5>
               <div className="row g-3 mb-4">
                 <div className="col-md-6">
@@ -115,8 +212,35 @@ const FIRForm = () => {
                 <input type="file" className="form-control fir-input" onChange={handleFileChange} />
                 <small className="text-muted d-block mt-1">Allowed: JPG, PNG, PDF (Max 5MB)</small>
               </div>
+              <button type="button" onClick={generatePDF} className="m-2">
+                    Download FIR PDF
+              </button>
 
-              {/* SUBMIT */}
+              <div className="mt-4">
+  <h5>Aadhaar eSign Verification</h5>
+
+  <input
+    type="text"
+    placeholder="Enter Aadhaar Number"
+    className="form-control mb-2"
+    onChange={(e) => setAadhaar(e.target.value)}
+  />
+
+  <button className="btn btn-primary mb-2" onClick={sendOTP}>
+    Send OTP
+  </button>
+
+  <input
+    type="text"
+    placeholder="Enter OTP"
+    className="form-control mb-2"
+    onChange={(e) => setOtp(e.target.value)}
+  />
+
+  <button className="btn btn-success" onClick={verifyOTP}>
+    Verify & Sign
+  </button>
+</div>
               <div className="d-grid shadow-sm">
                 <button type="submit" className="btn fir-btn-submit text-uppercase">
                   Submit Digital FIR
